@@ -1,0 +1,124 @@
+﻿@page
+@model BudgetApp.Pages.IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h2 class="fw-bold text-primary mb-1">@Model.HomeData.Greeting, @Model.HomeData.Username!</h2>
+                <p class="text-muted mb-3">Here is your Year-To-Date (YTD) financial snapshot</p>
+                <div class="row g-3">
+                    <div class="col-sm-4">
+                        <div class="stat-card bg-success-subtle rounded p-3">
+                            <div class="small text-muted fw-semibold">YTD EARNINGS</div>
+                            <div class="fs-4 fw-bold text-success">$@Model.HomeData.YtdEarnings.ToString("N2")</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="stat-card bg-danger-subtle rounded p-3">
+                            <div class="small text-muted fw-semibold">YTD EXPENSE</div>
+                            <div class="fs-4 fw-bold text-danger">$@Model.HomeData.YtdExpense.ToString("N2")</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="stat-card rounded p-3 @(Model.HomeData.YtdNet >= 0 ? "bg-primary-subtle" : "bg-warning-subtle")">
+                            <div class="small text-muted fw-semibold">YTD NET</div>
+                            <div class="fs-4 fw-bold @(Model.HomeData.YtdNet >= 0 ? "text-primary" : "text-warning-emphasis")">$@Model.HomeData.YtdNet.ToString("N2")</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-semibold text-primary"><i class="bi bi-calendar3 me-2"></i>@Model.HomeData.CurrentMonthLabel</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-4">
+                        <div class="stat-card bg-success-subtle rounded p-3">
+                            <div class="small text-muted fw-semibold">EARNINGS</div>
+                            <div class="fs-5 fw-bold text-success">$@Model.HomeData.CurrentMonthEarnings.ToString("N2")</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="stat-card bg-danger-subtle rounded p-3">
+                            <div class="small text-muted fw-semibold">EXPENSE</div>
+                            <div class="fs-5 fw-bold text-danger">$@Model.HomeData.CurrentMonthExpense.ToString("N2")</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="stat-card rounded p-3 @(Model.HomeData.CurrentMonthNet >= 0 ? "bg-primary-subtle" : "bg-warning-subtle")">
+                            <div class="small text-muted fw-semibold">NET</div>
+                            <div class="fs-5 fw-bold @(Model.HomeData.CurrentMonthNet >= 0 ? "text-primary" : "text-warning-emphasis")">$@Model.HomeData.CurrentMonthNet.ToString("N2")</div>
+                        </div>
+                    </div>
+                </div>
+                @if (Model.HomeData.CurrentMonthExpensePie.Any())
+                {
+                    <div class="d-flex justify-content-center">
+                        <div style="max-width:380px;width:100%;">
+                            <canvas id="monthExpenseChart"></canvas>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-pie-chart fs-1 opacity-25"></i>
+                        <p class="mt-2">No expenses recorded this month</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-semibold text-primary"><i class="bi bi-journals me-2"></i>Budgets</h5>
+                <button class="btn btn-primary btn-sm" onclick="BudgetModule.openBudgetList()">
+                    <i class="bi bi-plus-lg me-1"></i>Manage
+                </button>
+            </div>
+            <div class="card-body p-0">
+                @if (Model.HomeData.Budgets.Any())
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var budget in Model.HomeData.Budgets)
+                        {
+                            <button class="list-group-item list-group-item-action d-flex flex-column align-items-start py-3"
+                                    onclick="BudgetModule.openBudgetEdit(@budget.Id)">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <span class="fw-semibold">@budget.Name</span>
+                                    <span class="badge @(budget.IsTimeBound ? "bg-primary-subtle text-primary" : "bg-secondary-subtle text-secondary") small">
+                                        @(budget.IsTimeBound ? "Monthly" : "Custom")
+                                    </span>
+                                </div>
+                                <div class="d-flex gap-3 mt-1 small">
+                                    <span class="text-success"><i class="bi bi-arrow-up-circle me-1"></i>$@budget.TotalEarnings.ToString("N2")</span>
+                                    <span class="text-danger"><i class="bi bi-arrow-down-circle me-1"></i>$@budget.TotalExpense.ToString("N2")</span>
+                                    <span class="@(budget.Net >= 0 ? "text-primary" : "text-warning-emphasis") fw-semibold">Net: $@budget.Net.ToString("N2")</span>
+                                </div>
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-journals fs-1 opacity-25"></i>
+                        <p class="mt-2 small">No budgets yet. Click Manage to create one.</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <script>
+        const pieData = @Html.Raw(Model.PieChartJson);
+        HomeModule.initExpensePie(pieData);
+    </script>
+}
