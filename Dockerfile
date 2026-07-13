@@ -15,5 +15,9 @@ COPY --from=build /app/publish .
 EXPOSE 8080
 
 ENV ASPNETCORE_URLS=http://+:8080
+ENV DB_HOST=sqlserver
+ENV DB_PORT=1433
+ENV DB_NAME=BudgetAppDb
+ENV DB_USER=sa
 
 ENTRYPOINT ["dotnet", "BudgetApp.dll"]
