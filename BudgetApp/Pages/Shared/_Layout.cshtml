@@ -1,0 +1,136 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finora</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    @* Anti-forgery token — read by AJAX calls via getAntiForgeryToken() *@
+    <div hidden>@Html.AntiForgeryToken()</div>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="bi bi-wallet2 me-2"></i>Finora
+            </a>
+            @if (Context.Session.GetInt32("LoggedInUserId").HasValue)
+            {
+                <div class="navbar-nav ms-auto flex-row gap-2">
+                    <a class="nav-link btn btn-nav px-3" href="/">
+                        <i class="bi bi-house me-1"></i>Home
+                    </a>
+                    <button class="nav-link btn btn-nav px-3" onclick="BudgetModule.openBudgetList()">
+                        <i class="bi bi-journals me-1"></i>Budget
+                    </button>
+                    <button class="nav-link btn btn-nav px-3" onclick="CategoryModule.openCategoryList()">
+                        <i class="bi bi-tags me-1"></i>Category
+                    </button>
+                    <a class="nav-link btn btn-nav px-3" href="/Report">
+                        <i class="bi bi-bar-chart me-1"></i>Report
+                    </a>
+                    <button class="nav-link btn btn-nav px-3" onclick="UtilityModule.openUtility()">
+                        <i class="bi bi-tools me-1"></i>Utility
+                    </button>
+                    <span class="navbar-text text-white ms-3">
+                        <i class="bi bi-person-circle me-1"></i>
+                        @Context.Session.GetString("LoggedInUsername")
+                    </span>
+                    <a class="btn btn-outline-light btn-sm ms-2" href="/Login?handler=Logout">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </a>
+                </div>
+            }
+        </div>
+    </nav>
+
+    <main class="container-fluid py-4">
+        @RenderBody()
+    </main>
+
+    <!-- Budget List Modal -->
+    <div class="modal fade" id="budgetModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-journals me-2"></i>Budgets</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="budgetModalBody">
+                    <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Edit/View Modal -->
+    <div class="modal fade" id="budgetEditModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="budgetEditModalLabel"><i class="bi bi-journal-text me-2"></i>Budget Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="budgetEditModalBody">
+                    <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal fade" id="categoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-tags me-2"></i>Categories</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="categoryModalBody">
+                    <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Utility Modal -->
+    <div class="modal fade" id="utilityModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-tools me-2"></i>Utility</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="utilityModalBody">
+                    <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Linked Budgets Info Modal -->
+    <div class="modal fade" id="linkedBudgetsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h6 class="modal-title"><i class="bi bi-link-45deg me-1"></i>Also in Budgets</h6>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="linkedBudgetsModalBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/category.js" asp-append-version="true"></script>
+    <script src="~/js/budget.js" asp-append-version="true"></script>
+    <script src="~/js/home.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
