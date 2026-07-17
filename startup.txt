@@ -20,3 +20,8 @@ Notes:
 - The app container connects to SQL Server by the Docker service name 'sqlserver', not localhost.
 - On first startup, the app applies Entity Framework migrations automatically.
 - If you change the SQL password, update SA_PASSWORD in .env before running docker compose up --build -d.
+
+
+
+backup
+docker exec budgetapp-master-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "${SA_PASSWORD}" -Q "BACKUP DATABASE [BudgetAppDb] TO DISK = N'/var/opt/mssql/backup/BudgetAppDb.bak' WITH INIT, STATS = 10"

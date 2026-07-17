@@ -43,7 +43,8 @@ namespace BudgetApp.Services
                              bi.TransactionDateUtc < endUtc);
 
             if (filter.BudgetId.HasValue)
-                query = query.Where(bi => bi.BudgetId == filter.BudgetId.Value);
+                query = query.Where(bi => bi.BudgetId == filter.BudgetId.Value || bi.AdditionalLinks.Any(al => al.LinkedBudgetId == filter.BudgetId.Value)).Distinct();
+
 
             if (filter.CategoryId.HasValue)
                 query = query.Where(bi => bi.CategoryId == filter.CategoryId.Value);
@@ -51,7 +52,7 @@ namespace BudgetApp.Services
             if (filter.Type.HasValue)
                 query = query.Where(bi => bi.Type == filter.Type.Value);
 
-            var items = await query.OrderBy(bi => bi.TransactionDateUtc).ToListAsync();
+            var items = await query.OrderBy(bi => bi.TransactionDateUtc).Distinct().ToListAsync();
 
             var rows = items.Select(bi => new ReportRowViewModel
             {
