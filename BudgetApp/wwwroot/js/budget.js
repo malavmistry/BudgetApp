@@ -3,6 +3,7 @@
 const BudgetModule = (() => {
     let _budgetModal = null;
     let _editModal = null;
+    let _addItemModal = null;
     let _allBudgets = [];
     let _categories = [];
     let _currentBudgetId = null;
@@ -17,6 +18,11 @@ const BudgetModule = (() => {
     function getEditModal() {
         if (!_editModal) _editModal = new bootstrap.Modal(document.getElementById("budgetEditModal"));
         return _editModal;
+    }
+
+    function getAddItemModal() {
+        if (!_addItemModal) _addItemModal = new bootstrap.Modal(document.getElementById("addItemModal"));
+        return _addItemModal;
     }
 
     async function openBudgetList() {
@@ -496,6 +502,157 @@ const BudgetModule = (() => {
         return d.innerHTML;
     }
 
+    async function openAddItemDialog() {
+        getAddItemModal().show();
+
+        const body = document.getElementById("addItemModalBody");
+        body.innerHTML = spinner();
+
+        const [categories, allBudgets] = await Promise.all([
+            SiteUtils.getJson("/BudgetApi?handler=Categories"),
+            SiteUtils.getJson("/BudgetApi?handler=AllBudgets")
+        ]);
+
+        _categories = categories;
+        _allBudgets = allBudgets;
+        _currentBudget = null;
+        _currentItems = [];
+
+        const today = new Date();
+        const defaultDateInput = today.toISOString().split("T")[0];
+
+        const catOptions = _categories.map(c =>
+            `<option value="${c.id}">${escHtml(c.name)}</option>`
+        ).join("");
+
+        const budgetCheckboxes = _allBudgets.map(b =>
+            `<div class="form-check">
+                <input class="form-check-input" type="checkbox" id="qalink_${b.id}" value="${b.id}" />
+                <label class="form-check-label small" for="qalink_${b.id}">${escHtml(b.name)}</label>
+            </div>`
+        ).join("");
+
+        body.innerHTML = `
+            <div class="card border-primary mb-3">
+                <div class="card-body">
+                    <form onsubmit="BudgetModule.saveQuickAddItem(event)">
+                        <div class="row g-2 mb-2">
+                            <div class="col-sm-3">
+                                <label class="form-label small fw-semibold">Type <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" id="qaItemType" required>
+                                    <option value="1">Expense</option>
+                                    <option value="2">Earnings</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-4 position-relative">
+                                <label class="form-label small fw-semibold">Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm" id="qaItemNameInput"
+                                       maxlength="25" autocomplete="off"
+                                       oninput="BudgetModule.searchQaItemNames(this.value)"
+                                       onblur="setTimeout(()=>document.getElementById('qaItemNameDropdown').innerHTML='',200)"
+                                       required />
+                                <div id="qaItemNameDropdown" class="autocomplete-list"></div>
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label small fw-semibold">Category <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" id="qaItemCategory" required>
+                                    <option value="">Select...</option>
+                                    ${catOptions}
+                                </select>
+                            </div>
+                            <div class="col-sm-2">
+                                <label class="form-label small fw-semibold">Amount <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-sm" id="qaItemAmount"
+                                       step="0.01" min="0.01" required />
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-sm-3">
+                                <label class="form-label small fw-semibold">Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control form-control-sm" id="qaItemDate"
+                                       value="${defaultDateInput}" required />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-semibold">Note</label>
+                                <input type="text" class="form-control form-control-sm" id="qaItemNote" maxlength="500" />
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label small fw-semibold">Include In</label>
+                                <div class="border rounded p-2 bg-white" style="max-height:120px;overflow-y:auto;">
+                                    ${budgetCheckboxes || "<span class='text-muted small'>No other budgets</span>"}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Save</button>
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="qaItemRecurring" />
+                            <label class="form-check-label small" for="qaItemRecurring">
+                                <i class="bi bi-arrow-repeat me-1 text-success"></i>
+                                <strong>Recurring</strong> — automatically copy to new monthly budgets
+                            </label>
+                        </div>
+                    </form>
+                </div>
+            </div>`;
+    }
+
+    async function saveQuickAddItem(evt) {
+        evt.preventDefault();
+
+        const dateStr = fromDateInput(document.getElementById("qaItemDate").value.trim());
+
+        const budget = await SiteUtils.getJson(`/BudgetApi?handler=ResolveBudgetByDate&date=${encodeURIComponent(dateStr)}`);
+        if (!budget || !budget.id) {
+            SiteUtils.showToast("Could not resolve monthly budget for the selected date.", true);
+            return;
+        }
+
+        const linkedIds = Array.from(document.querySelectorAll("[id^='qalink_']:checked"))
+            .map(cb => parseInt(cb.value));
+
+        const payload = {
+            id: 0,
+            budgetId: budget.id,
+            type: parseInt(document.getElementById("qaItemType").value),
+            itemNameId: 0,
+            itemNameText: document.getElementById("qaItemNameInput").value.trim(),
+            categoryId: parseInt(document.getElementById("qaItemCategory").value),
+            amount: parseFloat(document.getElementById("qaItemAmount").value),
+            transactionDate: dateStr,
+            note: document.getElementById("qaItemNote").value.trim() || null,
+            isRecurring: document.getElementById("qaItemRecurring").checked,
+            linkedBudgetIds: linkedIds,
+            linkedBudgetNames: []
+        };
+
+        const result = await SiteUtils.postJson("/BudgetApi?handler=SaveItem", payload);
+        if (result.success) {
+            SiteUtils.showToast(`Item saved to ${escHtml(budget.name)}.`);
+            getAddItemModal().hide();
+            location.reload();
+        } else {
+            SiteUtils.showToast(result.error || "Failed to save item.", true);
+        }
+    }
+
+    async function searchQaItemNames(query) {
+        const dropdown = document.getElementById("qaItemNameDropdown");
+        if (!query || query.length < 1) { dropdown.innerHTML = ""; return; }
+        const results = await SiteUtils.getJson(`/ItemNameApi?handler=Search&q=${encodeURIComponent(query)}`);
+        if (!results || !results.length) { dropdown.innerHTML = ""; return; }
+        dropdown.innerHTML = results.map(r =>
+            `<div class="ac-item" onmousedown="BudgetModule.selectQaItemName('${escHtml(r.name)}')">${escHtml(r.name)}</div>`
+        ).join("");
+    }
+
+    function selectQaItemName(name) {
+        document.getElementById("qaItemNameInput").value = name;
+        document.getElementById("qaItemNameDropdown").innerHTML = "";
+    }
+
     // Utility Modal
     const UtilityModule = (() => {
         let _utilModal = null;
@@ -557,6 +714,10 @@ const BudgetModule = (() => {
         deleteItem,
         showLinkedBudgets,
         startEditBudgetName,
-        saveBudgetName
+        saveBudgetName,
+        openAddItemDialog,
+        saveQuickAddItem,
+        searchQaItemNames,
+        selectQaItemName
     };
 })();

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text.Json;
 using System.Threading.Tasks;
 using BudgetApp.Constants;
@@ -141,6 +142,24 @@ namespace BudgetApp.Pages
 
             var budgets = await _budgetService.GetUserBudgetsAsync(CurrentUserId.Value);
             return new JsonResult(budgets.Select(b => new { b.Id, b.Name }));
+        }
+
+        public async Task<IActionResult> OnGetResolveBudgetByDateAsync(string date)
+        {
+            if (!CurrentUserId.HasValue)
+                return Unauthorized();
+
+            if (!DateTime.TryParseExact(date, AppConstants.DATE_FORMAT, CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var localDate))
+                return BadRequest(new { error = "Invalid date format." });
+
+            var timeZoneId = Request.Cookies["userTimeZone"] ?? "UTC";
+            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            var utcDate = TimeZoneInfo.ConvertTimeToUtc(localDate, timeZone);
+            var twoDigitYear = utcDate.Year % 100;
+
+            var budget = await _budgetService.EnsureTimeBoundBudgetAsync(utcDate.Month, twoDigitYear, CurrentUserId.Value);
+            return new JsonResult(new { id = budget.Id, name = budget.Name });
         }
     }
 
