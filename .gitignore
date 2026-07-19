@@ -1,0 +1,6 @@
+.vs/*
+publish/*
+/BudgetApp/bin/*
+/BudgetApp/obj/*
+/BudgetApp/logs/*
+/BudgetApp/.vs/*
