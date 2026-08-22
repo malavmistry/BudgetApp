@@ -4,8 +4,10 @@ const BudgetModule = (() => {
     let _budgetModal = null;
     let _editModal = null;
     let _addItemModal = null;
+    let _recurringModal = null;
     let _allBudgets = [];
     let _categories = [];
+    let _recurringItems = [];
     let _currentBudgetId = null;
     let _currentItems = [];
     let _currentBudget = null;
@@ -23,6 +25,11 @@ const BudgetModule = (() => {
     function getAddItemModal() {
         if (!_addItemModal) _addItemModal = new bootstrap.Modal(document.getElementById("addItemModal"));
         return _addItemModal;
+    }
+
+    function getRecurringModal() {
+        if (!_recurringModal) _recurringModal = new bootstrap.Modal(document.getElementById("recurringItemsModal"));
+        return _recurringModal;
     }
 
     async function openBudgetList() {
@@ -55,7 +62,10 @@ const BudgetModule = (() => {
             </tr>`).join("");
 
         body.innerHTML = `
-            <div class="d-flex justify-content-end mb-3">
+            <div class="d-flex justify-content-between mb-3">
+                <button class="btn btn-outline-primary btn-sm" onclick="BudgetModule.openRecurringItems()">
+                    <i class="bi bi-arrow-repeat me-1"></i>Recurring Items
+                </button>
                 <button class="btn btn-primary btn-sm" onclick="BudgetModule.showCreateForm()">
                     <i class="bi bi-plus-lg me-1"></i>New Budget
                 </button>
@@ -638,6 +648,213 @@ const BudgetModule = (() => {
         }
     }
 
+    // ── Recurring Items ──────────────────────────────────────────────────────
+
+    async function openRecurringItems() {
+        getBudgetModal().hide();
+        getRecurringModal().show();
+        await renderRecurringList();
+    }
+
+    async function renderRecurringList() {
+        const body = document.getElementById("recurringItemsModalBody");
+        body.innerHTML = spinner();
+
+        const [items, categories] = await Promise.all([
+            SiteUtils.getJson("/RecurringItemApi?handler=List"),
+            SiteUtils.getJson("/RecurringItemApi?handler=Categories")
+        ]);
+
+        _recurringItems = items;
+        _categories = categories;
+
+        const rows = items.map(r => {
+            const typeLabel = r.type === 2 ? "Earnings" : "Expense";
+            const typeClass = r.type === 2 ? "bg-success-subtle text-success" : "bg-danger-subtle text-danger";
+            const amtClass = r.type === 2 ? "text-success" : "text-danger";
+            return `<tr>
+                <td><span class="badge ${typeClass} small">${typeLabel}</span></td>
+                <td class="fw-semibold small">${escHtml(r.itemNameText)}</td>
+                <td class="small text-muted">${escHtml(r.categoryName)}</td>
+                <td class="text-end small fw-semibold ${amtClass}">$${fmt(r.amount)}</td>
+                <td class="text-center small">${r.dayOfMonth}</td>
+                <td class="small text-muted">${escHtml(r.note || "")}</td>
+                <td>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch"
+                               ${r.isActive ? "checked" : ""}
+                               onchange="BudgetModule.toggleRecurringActive(${r.id}, this.checked)" />
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="BudgetModule.showRecurringForm(${r.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="BudgetModule.deleteRecurringItem(${r.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join("");
+
+        body.innerHTML = `
+            <div class="d-flex justify-content-end mb-3">
+                <button class="btn btn-primary btn-sm" onclick="BudgetModule.showRecurringForm(0)">
+                    <i class="bi bi-plus-lg me-1"></i>New Recurring Item
+                </button>
+            </div>
+            <div id="recurringFormContainer"></div>
+            <div class="table-responsive">
+                <table class="table table-hover table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Type</th><th>Name</th><th>Category</th>
+                            <th class="text-end">Amount</th><th class="text-center">Day</th>
+                            <th>Note</th><th>Active</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                ${items.length === 0 ? "<p class='text-muted text-center py-3'>No recurring items yet.</p>" : ""}
+            </div>`;
+    }
+
+    function showRecurringForm(itemId) {
+        const item = itemId === 0 ? null : _recurringItems.find(r => r.id === itemId);
+
+        const catOptions = _categories.map(c =>
+            `<option value="${c.id}" ${item && item.categoryId === c.id ? "selected" : ""}>${escHtml(c.name)}</option>`
+        ).join("");
+
+        const html = `
+            <div class="card border-primary mb-3">
+                <div class="card-header bg-primary-subtle fw-semibold">${itemId === 0 ? "New Recurring Item" : "Edit Recurring Item"}</div>
+                <div class="card-body">
+                    <form onsubmit="BudgetModule.saveRecurringItem(event, ${itemId})">
+                        <div class="row g-2 mb-2">
+                            <div class="col-sm-3">
+                                <label class="form-label small fw-semibold">Type <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" id="riType" required>
+                                    <option value="1" ${item && item.type === 1 ? "selected" : ""}>Expense</option>
+                                    <option value="2" ${item && item.type === 2 ? "selected" : ""}>Earnings</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-4 position-relative">
+                                <label class="form-label small fw-semibold">Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control form-control-sm" id="riName"
+                                       maxlength="25" value="${item ? escHtml(item.itemNameText) : ""}"
+                                       autocomplete="off"
+                                       oninput="BudgetModule.searchRiItemNames(this.value)"
+                                       onblur="setTimeout(()=>document.getElementById('riNameDropdown').innerHTML='',200)"
+                                       required />
+                                <div id="riNameDropdown" class="autocomplete-list"></div>
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label small fw-semibold">Category <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" id="riCategory" required>
+                                    <option value="">Select...</option>
+                                    ${catOptions}
+                                </select>
+                            </div>
+                            <div class="col-sm-2">
+                                <label class="form-label small fw-semibold">Amount <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-sm" id="riAmount"
+                                       step="0.01" min="0.01" value="${item ? item.amount : ""}" required />
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-sm-2">
+                                <label class="form-label small fw-semibold">Day of Month <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-sm" id="riDay"
+                                       min="1" max="31" value="${item ? item.dayOfMonth : 1}" required />
+                            </div>
+                            <div class="col-sm-7">
+                                <label class="form-label small fw-semibold">Note</label>
+                                <input type="text" class="form-control form-control-sm" id="riNote"
+                                       maxlength="500" value="${item ? escHtml(item.note || "") : ""}" />
+                            </div>
+                            <div class="col-sm-3 d-flex align-items-end pb-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="riActive"
+                                           ${!item || item.isActive ? "checked" : ""} />
+                                    <label class="form-check-label small fw-semibold" for="riActive">Active</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Save</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="document.getElementById('recurringFormContainer').innerHTML=''">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>`;
+
+        document.getElementById("recurringFormContainer").innerHTML = html;
+    }
+
+    async function saveRecurringItem(evt, itemId) {
+        evt.preventDefault();
+
+        const payload = {
+            id: itemId,
+            type: parseInt(document.getElementById("riType").value),
+            itemNameId: 0,
+            itemNameText: document.getElementById("riName").value.trim(),
+            categoryId: parseInt(document.getElementById("riCategory").value),
+            amount: parseFloat(document.getElementById("riAmount").value),
+            note: document.getElementById("riNote").value.trim() || null,
+            dayOfMonth: parseInt(document.getElementById("riDay").value),
+            isActive: document.getElementById("riActive").checked
+        };
+
+        const result = await SiteUtils.postJson("/RecurringItemApi?handler=Save", payload);
+        if (result.success) {
+            SiteUtils.showToast("Recurring item saved.");
+            await renderRecurringList();
+        } else {
+            SiteUtils.showToast(result.error || "Failed to save recurring item.", true);
+        }
+    }
+
+    async function deleteRecurringItem(id) {
+        if (!confirm("Delete this recurring item? Existing budget items will not be affected.")) return;
+        const result = await SiteUtils.postJson("/RecurringItemApi?handler=Delete", { id });
+        if (result.success) {
+            SiteUtils.showToast("Recurring item deleted.");
+            await renderRecurringList();
+        } else {
+            SiteUtils.showToast("Failed to delete recurring item.", true);
+        }
+    }
+
+    async function toggleRecurringActive(id, isActive) {
+        const result = await SiteUtils.postJson("/RecurringItemApi?handler=SetActive", { id, isActive });
+        if (!result.success) {
+            SiteUtils.showToast("Failed to update status.", true);
+            await renderRecurringList();
+        }
+    }
+
+    async function searchRiItemNames(query) {
+        const dropdown = document.getElementById("riNameDropdown");
+        if (!query || query.length < 1) { dropdown.innerHTML = ""; return; }
+        const results = await SiteUtils.getJson(`/ItemNameApi?handler=Search&q=${encodeURIComponent(query)}`);
+        if (!results || !results.length) { dropdown.innerHTML = ""; return; }
+        dropdown.innerHTML = results.map(r =>
+            `<div class="ac-item" onmousedown="BudgetModule.selectRiItemName('${escHtml(r.name)}')">${escHtml(r.name)}</div>`
+        ).join("");
+    }
+
+    function selectRiItemName(name) {
+        document.getElementById("riName").value = name;
+        document.getElementById("riNameDropdown").innerHTML = "";
+    }
+
+    // ── Quick Add Item (home page) ──────────────────────────────────────────
+
     async function searchQaItemNames(query) {
         const dropdown = document.getElementById("qaItemNameDropdown");
         if (!query || query.length < 1) { dropdown.innerHTML = ""; return; }
@@ -718,6 +935,13 @@ const BudgetModule = (() => {
         openAddItemDialog,
         saveQuickAddItem,
         searchQaItemNames,
-        selectQaItemName
+        selectQaItemName,
+        openRecurringItems,
+        showRecurringForm,
+        saveRecurringItem,
+        deleteRecurringItem,
+        toggleRecurringActive,
+        searchRiItemNames,
+        selectRiItemName
     };
 })();

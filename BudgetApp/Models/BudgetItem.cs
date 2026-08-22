@@ -31,6 +31,11 @@ namespace BudgetApp.Models
         /// </summary>
         public bool IsRecurring { get; set; }
 
+        /// <summary>
+        /// Links this item to a RecurringItem template. Null if not recurring.
+        /// </summary>
+        public int? RecurringItemId { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
@@ -42,5 +47,7 @@ namespace BudgetApp.Models
         public Category Category { get; set; } = null!;
 
         public ICollection<BudgetItemLink> AdditionalLinks { get; set; } = new List<BudgetItemLink>();
+
+        public RecurringItem? RecurringItem { get; set; }
     }
 }

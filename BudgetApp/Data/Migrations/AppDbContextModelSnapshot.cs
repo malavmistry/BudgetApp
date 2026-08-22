@@ -89,6 +89,9 @@ namespace BudgetApp.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<int?>("RecurringItemId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("TransactionDateUtc")
                         .HasColumnType("datetime2");
 
@@ -105,6 +108,8 @@ namespace BudgetApp.Data.Migrations
                     b.HasIndex("CategoryId");
 
                     b.HasIndex("ItemNameId");
+
+                    b.HasIndex("RecurringItemId");
 
                     b.ToTable("BudgetItems");
                 });
@@ -212,6 +217,57 @@ namespace BudgetApp.Data.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("BudgetApp.Models.RecurringItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DayOfMonth")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ItemNameId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("ItemNameId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RecurringItems");
+                });
+
             modelBuilder.Entity("BudgetApp.Models.Budget", b =>
                 {
                     b.HasOne("BudgetApp.Models.User", "User")
@@ -243,11 +299,18 @@ namespace BudgetApp.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("BudgetApp.Models.RecurringItem", "RecurringItem")
+                        .WithMany("BudgetItems")
+                        .HasForeignKey("RecurringItemId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Budget");
 
                     b.Navigation("Category");
 
                     b.Navigation("ItemName");
+
+                    b.Navigation("RecurringItem");
                 });
 
             modelBuilder.Entity("BudgetApp.Models.BudgetItemLink", b =>
@@ -279,6 +342,33 @@ namespace BudgetApp.Data.Migrations
             modelBuilder.Entity("BudgetApp.Models.BudgetItem", b =>
                 {
                     b.Navigation("AdditionalLinks");
+                });
+
+            modelBuilder.Entity("BudgetApp.Models.RecurringItem", b =>
+                {
+                    b.HasOne("BudgetApp.Models.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BudgetApp.Models.ItemName", "ItemName")
+                        .WithMany()
+                        .HasForeignKey("ItemNameId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BudgetApp.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("ItemName");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("BudgetApp.Models.Category", b =>

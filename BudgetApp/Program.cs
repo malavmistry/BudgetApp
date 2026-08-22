@@ -77,6 +77,7 @@ static void RegisterAppServices(IServiceCollection services)
     services.AddScoped<IItemNameService, ItemNameService>();
     services.AddScoped<IBudgetService, BudgetService>();
     services.AddScoped<IReportService, ReportService>();
+    services.AddScoped<IRecurringItemService, RecurringItemService>();
 }
 
 static async Task ApplyMigrationsAsync(WebApplication app)

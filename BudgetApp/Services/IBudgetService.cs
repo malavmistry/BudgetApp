@@ -12,7 +12,8 @@ namespace BudgetApp.Services
 
         Task<Budget?> GetBudgetDetailAsync(int budgetId, int userId);
 
-        Task<Budget> CreateBudgetAsync(string name, bool isTimeBound, int? month, int? year, int userId);
+        Task<(bool Success, Budget? Budget, string? Error)> CreateBudgetAsync(
+            string name, bool isTimeBound, int? month, int? year, int userId);
 
         Task<Budget> EnsureTimeBoundBudgetAsync(int month, int year, int userId);
 

@@ -14,6 +14,7 @@ namespace BudgetApp.Data
         public DbSet<Budget> Budgets { get; set; }
         public DbSet<BudgetItem> BudgetItems { get; set; }
         public DbSet<BudgetItemLink> BudgetItemLinks { get; set; }
+        public DbSet<RecurringItem> RecurringItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,6 +26,7 @@ namespace BudgetApp.Data
             ConfigureBudget(modelBuilder);
             ConfigureBudgetItem(modelBuilder);
             ConfigureBudgetItemLink(modelBuilder);
+            ConfigureRecurringItem(modelBuilder);
         }
 
         private static void ConfigureUser(ModelBuilder modelBuilder)
@@ -96,6 +98,11 @@ namespace BudgetApp.Data
                       .WithMany(c => c.BudgetItems)
                       .HasForeignKey(bi => bi.CategoryId)
                       .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(bi => bi.RecurringItem)
+                      .WithMany(r => r.BudgetItems)
+                      .HasForeignKey(bi => bi.RecurringItemId)
+                      .OnDelete(DeleteBehavior.SetNull);
             });
         }
 
@@ -116,6 +123,31 @@ namespace BudgetApp.Data
                       .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasIndex(l => new { l.BudgetItemId, l.LinkedBudgetId }).IsUnique();
+            });
+        }
+
+        private static void ConfigureRecurringItem(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<RecurringItem>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+                entity.Property(r => r.Amount).HasPrecision(18, 2);
+                entity.Property(r => r.Note).HasMaxLength(500);
+
+                entity.HasOne(r => r.User)
+                      .WithMany()
+                      .HasForeignKey(r => r.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(r => r.ItemName)
+                      .WithMany()
+                      .HasForeignKey(r => r.ItemNameId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(r => r.Category)
+                      .WithMany()
+                      .HasForeignKey(r => r.CategoryId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

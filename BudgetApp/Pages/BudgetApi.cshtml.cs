@@ -1,14 +1,11 @@
-using System.Collections.Generic;
 using System.Globalization;
 using System.Text.Json;
 using System.Threading.Tasks;
 using BudgetApp.Constants;
-using BudgetApp.Data;
 using BudgetApp.Services;
 using BudgetApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace BudgetApp.Pages
@@ -17,18 +14,15 @@ namespace BudgetApp.Pages
     {
         private readonly IBudgetService _budgetService;
         private readonly ICategoryService _categoryService;
-        private readonly AppDbContext _dbContext;
         private readonly ILogger<BudgetApiModel> _logger;
 
         public BudgetApiModel(
             IBudgetService budgetService,
             ICategoryService categoryService,
-            AppDbContext dbContext,
             ILogger<BudgetApiModel> logger)
         {
             _budgetService = budgetService;
             _categoryService = categoryService;
-            _dbContext = dbContext;
             _logger = logger;
         }
 
@@ -103,12 +97,11 @@ namespace BudgetApp.Pages
             if (!CurrentUserId.HasValue)
                 return Unauthorized();
 
-            var existingBudgets = await _budgetService.GetUserBudgetsAsync(CurrentUserId.Value);
-            if (existingBudgets.Any(b => b.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase)))
-                return new JsonResult(new { success = false, error = $"Budget '{request.Name}' already exists." });
-
-            var budget = await _budgetService.CreateBudgetAsync(
+            var (success, budget, error) = await _budgetService.CreateBudgetAsync(
                 request.Name, request.IsTimeBound, request.Month, request.Year, CurrentUserId.Value);
+
+            if (!success || budget is null)
+                return new JsonResult(new { success = false, error });
 
             return new JsonResult(new { success = true, id = budget.Id, name = budget.Name });
         }
@@ -161,24 +154,5 @@ namespace BudgetApp.Pages
             var budget = await _budgetService.EnsureTimeBoundBudgetAsync(utcDate.Month, twoDigitYear, CurrentUserId.Value);
             return new JsonResult(new { id = budget.Id, name = budget.Name });
         }
-    }
-
-    public class DeleteRequest
-    {
-        public int Id { get; set; }
-    }
-
-    public class CreateBudgetRequest
-    {
-        public string Name { get; set; } = string.Empty;
-        public bool IsTimeBound { get; set; }
-        public int? Month { get; set; }
-        public int? Year { get; set; }
-    }
-
-    public class RenameBudgetRequest
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
     }
 }
