@@ -107,8 +107,9 @@ namespace BudgetApp.Pages
             if (existingBudgets.Any(b => b.Name.Equals(request.Name, StringComparison.OrdinalIgnoreCase)))
                 return new JsonResult(new { success = false, error = $"Budget '{request.Name}' already exists." });
 
+            var timeZoneId = Request.Cookies["userTimeZone"] ?? "UTC";
             var budget = await _budgetService.CreateBudgetAsync(
-                request.Name, request.IsTimeBound, request.Month, request.Year, CurrentUserId.Value);
+                request.Name, request.IsTimeBound, request.Month, request.Year, CurrentUserId.Value, timeZoneId);
 
             return new JsonResult(new { success = true, id = budget.Id, name = budget.Name });
         }
@@ -158,7 +159,11 @@ namespace BudgetApp.Pages
             var utcDate = TimeZoneInfo.ConvertTimeToUtc(localDate, timeZone);
             var twoDigitYear = utcDate.Year % 100;
 
-            var budget = await _budgetService.EnsureTimeBoundBudgetAsync(utcDate.Month, twoDigitYear, CurrentUserId.Value);
+            var budget = await _budgetService.EnsureTimeBoundBudgetAsync(
+                utcDate.Month,
+                twoDigitYear,
+                CurrentUserId.Value,
+                timeZoneId);
             return new JsonResult(new { id = budget.Id, name = budget.Name });
         }
     }

@@ -14,6 +14,7 @@ namespace BudgetApp.Data
         public DbSet<Budget> Budgets { get; set; }
         public DbSet<BudgetItem> BudgetItems { get; set; }
         public DbSet<BudgetItemLink> BudgetItemLinks { get; set; }
+        public DbSet<RecurringItem> RecurringItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -23,6 +24,7 @@ namespace BudgetApp.Data
             ConfigureCategory(modelBuilder);
             ConfigureItemName(modelBuilder);
             ConfigureBudget(modelBuilder);
+            ConfigureRecurringItem(modelBuilder);
             ConfigureBudgetItem(modelBuilder);
             ConfigureBudgetItemLink(modelBuilder);
         }
@@ -96,8 +98,40 @@ namespace BudgetApp.Data
                       .WithMany(c => c.BudgetItems)
                       .HasForeignKey(bi => bi.CategoryId)
                       .OnDelete(DeleteBehavior.Restrict);
+
+                    entity.HasOne(bi => bi.RecurringItem)
+                        .WithMany(ri => ri.BudgetItems)
+                        .HasForeignKey(bi => bi.RecurringItemId)
+                        .OnDelete(DeleteBehavior.NoAction);
             });
         }
+
+              private static void ConfigureRecurringItem(ModelBuilder modelBuilder)
+              {
+                modelBuilder.Entity<RecurringItem>(entity =>
+                {
+                    entity.HasKey(ri => ri.Id);
+                    entity.Property(ri => ri.Amount).HasPrecision(18, 2);
+                    entity.Property(ri => ri.Note).HasMaxLength(500);
+
+                    entity.HasOne(ri => ri.User)
+                        .WithMany(u => u.RecurringItems)
+                        .HasForeignKey(ri => ri.UserId)
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    entity.HasOne(ri => ri.ItemName)
+                        .WithMany()
+                        .HasForeignKey(ri => ri.ItemNameId)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    entity.HasOne(ri => ri.Category)
+                        .WithMany()
+                        .HasForeignKey(ri => ri.CategoryId)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    entity.HasIndex(ri => new { ri.UserId, ri.IsActive });
+                });
+              }
 
         private static void ConfigureBudgetItemLink(ModelBuilder modelBuilder)
         {

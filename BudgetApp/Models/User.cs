@@ -12,5 +12,7 @@ namespace BudgetApp.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<Budget> Budgets { get; set; } = new List<Budget>();
+
+        public ICollection<RecurringItem> RecurringItems { get; set; } = new List<RecurringItem>();
     }
 }

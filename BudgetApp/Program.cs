@@ -76,6 +76,7 @@ static void RegisterAppServices(IServiceCollection services)
     services.AddScoped<ICategoryService, CategoryService>();
     services.AddScoped<IItemNameService, ItemNameService>();
     services.AddScoped<IBudgetService, BudgetService>();
+    services.AddScoped<IRecurringItemService, RecurringItemService>();
     services.AddScoped<IReportService, ReportService>();
 }
 

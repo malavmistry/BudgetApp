@@ -17,3 +17,4 @@ This file is the authoritative database-rules document for BudgetApp.
 - Query logic SHOULD remain in services.
 - Ownership and user scoping MUST be preserved in queries.
 - Delete behaviors MUST remain intentional and documented.
+- Recurring templates are stored in `RecurringItems`, owned by `User`, and `BudgetItems` reference them through an optional FK that must avoid SQL Server multi-cascade paths.

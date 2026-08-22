@@ -67,7 +67,7 @@ namespace BudgetApp.Services
         }
 
         public async Task<Budget> CreateBudgetAsync(
-            string name, bool isTimeBound, int? month, int? year, int userId)
+            string name, bool isTimeBound, int? month, int? year, int userId, string userTimeZoneId)
         {
             var budget = new Budget
             {
@@ -82,11 +82,16 @@ namespace BudgetApp.Services
             _dbContext.Budgets.Add(budget);
             await _dbContext.SaveChangesAsync();
 
+            if (isTimeBound && month.HasValue && year.HasValue)
+            {
+                await CopyRecurringItemsAsync(budget, userId, userTimeZoneId);
+            }
+
             _logger.LogInformation("Created budget {BudgetName} for user {UserId}", name, userId);
             return budget;
         }
 
-        public async Task<Budget> EnsureTimeBoundBudgetAsync(int month, int year, int userId)
+        public async Task<Budget> EnsureTimeBoundBudgetAsync(int month, int year, int userId, string userTimeZoneId)
         {
             var existing = await _dbContext.Budgets
                 .FirstOrDefaultAsync(b =>
@@ -105,9 +110,7 @@ namespace BudgetApp.Services
             _logger.LogInformation(
                 "Auto-creating time-bound budget {BudgetName} for user {UserId}", budgetName, userId);
 
-            var newBudget = await CreateBudgetAsync(budgetName, true, month, twoDigitYear, userId);
-            await CopyRecurringItemsAsync(newBudget, userId);
-            return newBudget;
+            return await CreateBudgetAsync(budgetName, true, month, twoDigitYear, userId, userTimeZoneId);
         }
 
         public async Task<BudgetItem> SaveBudgetItemAsync(
@@ -139,7 +142,10 @@ namespace BudgetApp.Services
             var utcDate = TimeZoneInfo.ConvertTimeToUtc(localDate, timeZone);
 
             var timeBoundBudget = await EnsureTimeBoundBudgetAsync(
-                utcDate.Month, utcDate.Year % 100 == 0 ? utcDate.Year / 100 : utcDate.Year % 100, userId);
+                utcDate.Month,
+                utcDate.Year % 100 == 0 ? utcDate.Year / 100 : utcDate.Year % 100,
+                userId,
+                userTimeZoneId);
 
             BudgetItem item;
 
@@ -154,10 +160,15 @@ namespace BudgetApp.Services
                     Amount = Math.Truncate(viewModel.Amount * 100) / 100,
                     TransactionDateUtc = utcDate,
                     Note = viewModel.Note,
-                    IsRecurring = viewModel.IsRecurring,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
+
+                if (viewModel.IsRecurring)
+                {
+                    var recurringItem = await SaveOrSyncRecurringItemAsync(viewModel, userId);
+                    item.RecurringItemId = recurringItem.Id;
+                }
 
                 _dbContext.BudgetItems.Add(item);
                 await _dbContext.SaveChangesAsync();
@@ -166,6 +177,7 @@ namespace BudgetApp.Services
             {
                 item = await _dbContext.BudgetItems
                     .Include(bi => bi.AdditionalLinks)
+                    .Include(bi => bi.RecurringItem)
                     .FirstAsync(bi => bi.Id == viewModel.Id);
 
                 item.Type = viewModel.Type;
@@ -174,8 +186,17 @@ namespace BudgetApp.Services
                 item.Amount = Math.Truncate(viewModel.Amount * 100) / 100;
                 item.TransactionDateUtc = utcDate;
                 item.Note = viewModel.Note;
-                item.IsRecurring = viewModel.IsRecurring;
                 item.UpdatedAt = DateTime.UtcNow;
+
+                if (viewModel.IsRecurring)
+                {
+                    var recurringItem = await SaveOrSyncRecurringItemAsync(viewModel, userId);
+                    item.RecurringItemId = recurringItem.Id;
+                }
+                else
+                {
+                    item.RecurringItemId = null;
+                }
 
                 _dbContext.BudgetItemLinks.RemoveRange(item.AdditionalLinks);
                 await _dbContext.SaveChangesAsync();
@@ -200,6 +221,54 @@ namespace BudgetApp.Services
 
             await _dbContext.SaveChangesAsync();
             return item;
+        }
+
+        public async Task<RecurringItem> SaveOrSyncRecurringItemAsync(BudgetItemViewModel viewModel, int userId)
+        {
+            var itemName = await _itemNameService.GetOrCreateAsync(viewModel.ItemNameText);
+            var localDate = DateTime.ParseExact(
+                viewModel.TransactionDate,
+                AppConstants.DATE_FORMAT,
+                CultureInfo.InvariantCulture);
+            var recurringItemId = viewModel.RecurringItemId;
+
+            RecurringItem? recurringItem = null;
+            if (recurringItemId.HasValue)
+            {
+                recurringItem = await _dbContext.RecurringItems
+                    .FirstOrDefaultAsync(ri => ri.Id == recurringItemId.Value && ri.UserId == userId);
+            }
+
+            if (recurringItem is null && viewModel.Id != 0)
+            {
+                recurringItem = await _dbContext.BudgetItems
+                    .Where(bi => bi.Id == viewModel.Id)
+                    .Select(bi => bi.RecurringItem)
+                    .FirstOrDefaultAsync(ri => ri != null && ri.UserId == userId);
+            }
+
+            if (recurringItem is null)
+            {
+                recurringItem = new RecurringItem
+                {
+                    UserId = userId,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _dbContext.RecurringItems.Add(recurringItem);
+            }
+
+            recurringItem.Type = viewModel.Type;
+            recurringItem.ItemNameId = itemName.Id;
+            recurringItem.CategoryId = viewModel.CategoryId;
+            recurringItem.Amount = Math.Truncate(viewModel.Amount * 100) / 100;
+            recurringItem.Note = viewModel.Note;
+            recurringItem.DayOfMonth = localDate.Day;
+            recurringItem.IsActive = true;
+            recurringItem.UpdatedAt = DateTime.UtcNow;
+
+            await _dbContext.SaveChangesAsync();
+            return recurringItem;
         }
 
         public async Task DeleteBudgetItemAsync(int itemId)
@@ -391,38 +460,38 @@ namespace BudgetApp.Services
                 PrimaryBudgetName = primaryBudgetName,
                 LinkedBudgetIds = bi.AdditionalLinks.Select(l => l.LinkedBudgetId).ToList(),
                 LinkedBudgetNames = bi.AdditionalLinks.Select(l => l.LinkedBudget?.Name ?? string.Empty).ToList(),
-                IsRecurring = bi.IsRecurring
+                IsRecurring = bi.RecurringItemId.HasValue,
+                RecurringItemId = bi.RecurringItemId
             };
         }
 
         /// <summary>
-        /// Copies all unique recurring items from the user's existing budgets into
-        /// the newly created time-bound budget, using the 1st of the new month as
-        /// the transaction date. Deduplicates by (ItemNameId, CategoryId, Type).
-        /// </summary>
-        private async Task CopyRecurringItemsAsync(Budget newBudget, int userId)
+        private async Task CopyRecurringItemsAsync(Budget newBudget, int userId, string userTimeZoneId)
         {
             if (!newBudget.Month.HasValue || !newBudget.Year.HasValue)
                 return;
 
             var fullYear = 2000 + newBudget.Year.Value;
-            var firstDayUtc = new DateTime(fullYear, newBudget.Month.Value, 1, 0, 0, 0, DateTimeKind.Utc);
+            var daysInMonth = DateTime.DaysInMonth(fullYear, newBudget.Month.Value);
+            var timeZone = GetTimeZone(userTimeZoneId);
 
-            var allRecurring = await _dbContext.BudgetItems
-                .Include(bi => bi.Budget)
-                .Where(bi => bi.Budget.UserId == userId &&
-                             bi.IsRecurring &&
-                             bi.BudgetId != newBudget.Id)
-                .OrderByDescending(bi => bi.UpdatedAt)
+            var allRecurring = await _dbContext.RecurringItems
+                .Where(ri => ri.UserId == userId && ri.IsActive)
+                .OrderBy(ri => ri.ItemNameId)
                 .ToListAsync();
-
-            var seen = new HashSet<(int ItemNameId, int CategoryId, TransactionType Type)>();
 
             foreach (var source in allRecurring)
             {
-                var key = (source.ItemNameId, source.CategoryId, source.Type);
-                if (!seen.Add(key))
-                    continue;
+                var day = Math.Min(source.DayOfMonth, daysInMonth);
+                var localTransactionDate = new DateTime(
+                    fullYear,
+                    newBudget.Month.Value,
+                    day,
+                    0,
+                    0,
+                    0,
+                    DateTimeKind.Unspecified);
+                var transactionDateUtc = TimeZoneInfo.ConvertTimeToUtc(localTransactionDate, timeZone);
 
                 _dbContext.BudgetItems.Add(new BudgetItem
                 {
@@ -431,20 +500,20 @@ namespace BudgetApp.Services
                     ItemNameId = source.ItemNameId,
                     CategoryId = source.CategoryId,
                     Amount = source.Amount,
-                    TransactionDateUtc = firstDayUtc,
+                    TransactionDateUtc = transactionDateUtc,
                     Note = source.Note,
-                    IsRecurring = true,
+                    RecurringItemId = source.Id,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 });
             }
 
-            if (seen.Count > 0)
+            if (allRecurring.Count > 0)
             {
                 await _dbContext.SaveChangesAsync();
                 _logger.LogInformation(
                     "Copied {Count} recurring items into budget {BudgetName}",
-                    seen.Count, newBudget.Name);
+                    allRecurring.Count, newBudget.Name);
             }
         }
 

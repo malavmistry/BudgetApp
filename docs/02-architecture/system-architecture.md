@@ -39,6 +39,8 @@ BudgetApp is a server-rendered ASP.NET Core Razor Pages application with a servi
 - A budget item has one primary budget and zero or more linked budgets.
 - Quick Add resolves the primary monthly budget from transaction date and must not ask the user to choose it.
 - Recurring item behavior seeds future monthly budgets through service logic.
+- Recurring item copying is based on the user's local calendar date semantics, not the stored UTC day.
+- If a recurring item's local day is unavailable in the target month, service logic must clamp to the last valid day of that month.
 
 ## Runtime composition
 

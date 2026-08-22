@@ -60,6 +60,8 @@ namespace BudgetApp.ViewModels
 
         public bool IsRecurring { get; set; }
 
+        public int? RecurringItemId { get; set; }
+
         public List<int> LinkedBudgetIds { get; set; } = new();
 
         public List<string> LinkedBudgetNames { get; set; } = new();

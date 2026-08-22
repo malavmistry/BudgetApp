@@ -12,9 +12,9 @@ namespace BudgetApp.Services
 
         Task<Budget?> GetBudgetDetailAsync(int budgetId, int userId);
 
-        Task<Budget> CreateBudgetAsync(string name, bool isTimeBound, int? month, int? year, int userId);
+        Task<Budget> CreateBudgetAsync(string name, bool isTimeBound, int? month, int? year, int userId, string userTimeZoneId);
 
-        Task<Budget> EnsureTimeBoundBudgetAsync(int month, int year, int userId);
+        Task<Budget> EnsureTimeBoundBudgetAsync(int month, int year, int userId, string userTimeZoneId);
 
         Task<BudgetItem> SaveBudgetItemAsync(BudgetItemViewModel viewModel, int userId, string userTimeZoneId);
 
@@ -25,5 +25,7 @@ namespace BudgetApp.Services
         Task<BudgetViewModel> BuildBudgetViewModelAsync(int budgetId, int userId, string userTimeZoneId);
 
         Task<(bool Success, string? Error)> RenameBudgetAsync(int budgetId, string newName, int userId);
+
+        Task<RecurringItem> SaveOrSyncRecurringItemAsync(BudgetItemViewModel viewModel, int userId);
     }
 }

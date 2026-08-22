@@ -29,6 +29,8 @@ BudgetApp is a personal budgeting web application used to manage monthly budgets
 - Monthly budgets are identified by `IsTimeBound = true`, `Month`, and two-digit `Year`.
 - Transaction dates are persisted in UTC.
 - The browser timezone is read from the `userTimeZone` cookie.
+- When a new time-bound budget is created, all active recurring items are copied into it through service logic.
+- Recurring items use the user's local calendar day for copying into a month-bound budget; if that day does not exist in the target month, the previous valid day is used.
 - Quick Add on the home page resolves the primary monthly budget from the selected transaction date and MAY auto-create that budget.
 - AJAX behavior is implemented through named Razor Page handlers instead of MVC controllers.
 

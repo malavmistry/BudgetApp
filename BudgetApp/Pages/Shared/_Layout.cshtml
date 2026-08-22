@@ -25,6 +25,9 @@
                     <button class="nav-link btn btn-nav px-3" onclick="BudgetModule.openBudgetList()">
                         <i class="bi bi-journals me-1"></i>Budget
                     </button>
+                    <button class="nav-link btn btn-nav px-3" onclick="RecurringItemModule.openRecurringItemList()">
+                        <i class="bi bi-arrow-repeat me-1"></i>Recurring Item
+                    </button>
                     <button class="nav-link btn btn-nav px-3" onclick="CategoryModule.openCategoryList()">
                         <i class="bi bi-tags me-1"></i>Category
                     </button>
@@ -95,6 +98,21 @@
         </div>
     </div>
 
+    <!-- Recurring Item Modal -->
+    <div class="modal fade" id="recurringItemModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>Recurring Items</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="recurringItemModalBody">
+                    <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Utility Modal -->
     <div class="modal fade" id="utilityModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
@@ -145,6 +163,7 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/category.js" asp-append-version="true"></script>
     <script src="~/js/budget.js" asp-append-version="true"></script>
+    <script src="~/js/recurring-item.js" asp-append-version="true"></script>
     <script src="~/js/home.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
