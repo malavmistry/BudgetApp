@@ -1,27 +1,24 @@
-BudgetApp Docker startup
+BudgetApp startup
 
-1. Open PowerShell in the repository root:
-   D:\repos\BudgetApp-master\BudgetApp-master
+Authoritative setup and migration instructions:
+docs\09-development\development-workflow.md
+docs\05-database\database-architecture.md
 
-2. Build and start the application and SQL Server containers:
-   docker compose up --build -d
+Native quick start (repository root):
+1. Start the existing host SQL Server on TCP port 1433.
+2. Set Database:Password in the ignored BudgetApp\appsettings.Local.json.
+3. Run: dotnet run --project BudgetApp\BudgetApp.csproj
 
-3. Check that both containers are healthy:
-   docker compose ps
+Docker quick start (repository root):
+1. Start the existing host SQL Server on TCP port 1433.
+2. Copy .env.example to .env and set DB_PASSWORD.
+3. Validate: docker compose config --quiet
+4. Start: docker compose up --build -d
+5. Check: docker compose ps
+6. Check migrations: docker compose logs budgetapp
+7. Open: http://localhost:8080
+8. Stop: docker compose down
 
-4. Open the application in a browser:
-   http://localhost:8080
-
-5. To stop the stack:
-   docker compose down
-
-Notes:
-- The SQL Server password is read from the .env file in this folder.
-- The app container connects to SQL Server by the Docker service name 'sqlserver', not localhost.
-- On first startup, the app applies Entity Framework migrations automatically.
-- If you change the SQL password, update SA_PASSWORD in .env before running docker compose up --build -d.
-
-
-
-backup
-docker exec budgetapp-master-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "${SA_PASSWORD}" -Q "BACKUP DATABASE [BudgetAppDb] TO DISK = N'/var/opt/mssql/backup/BudgetAppDb.bak' WITH INIT, STATS = 10"
+Compose runs only the app, not SQL Server. Backups belong to the host server.
+Before retiring the old Compose SQL Server, back up and transfer any volume data.
+Startup creates a missing database or applies pending EF migrations to an existing one.

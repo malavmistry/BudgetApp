@@ -4,3 +4,5 @@ publish/*
 /BudgetApp/obj/*
 /BudgetApp/logs/*
 /BudgetApp/.vs/*
+.env
+/BudgetApp/appsettings.Local.json

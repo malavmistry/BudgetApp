@@ -1,5 +1,6 @@
 ﻿using BudgetApp.Data;
 using BudgetApp.Services;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -13,6 +14,10 @@ try
     Log.Information("Starting App");
 
     var builder = WebApplication.CreateBuilder(args);
+    builder.Configuration
+        .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false)
+        .AddEnvironmentVariables()
+        .AddCommandLine(args);
 
     builder.Host.UseSerilog((ctx, services, config) => config
         .ReadFrom.Configuration(ctx.Configuration)
@@ -23,8 +28,9 @@ try
 
     builder.Services.AddRazorPages();
 
+    var connectionString = GetDatabaseConnectionString(builder.Configuration);
     builder.Services.AddDbContext<AppDbContext>(opts =>
-        opts.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+        opts.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
 
     builder.Services.AddDistributedMemoryCache();
     builder.Services.AddSession(opts =>
@@ -64,6 +70,7 @@ try
 catch (Exception ex)
 {
     Log.Fatal(ex, "Budget App terminated unexpectedly");
+    throw;
 }
 finally
 {
@@ -84,7 +91,46 @@ static async Task ApplyMigrationsAsync(WebApplication app)
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    app.Logger.LogInformation("Applying pending database migrations");
     await db.Database.MigrateAsync();
+    app.Logger.LogInformation("Database migrations complete");
+}
+
+static string GetDatabaseConnectionString(IConfiguration configuration)
+{
+    var connectionString = configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrWhiteSpace(connectionString))
+    {
+        return connectionString;
+    }
+
+    var host = configuration["Database:Host"];
+    var database = configuration["Database:Name"];
+    var user = configuration["Database:User"];
+    var password = configuration["Database:Password"];
+    var port = configuration.GetValue<int>("Database:Port");
+
+    if (string.IsNullOrWhiteSpace(host) ||
+        string.IsNullOrWhiteSpace(database) ||
+        string.IsNullOrWhiteSpace(user) ||
+        string.IsNullOrWhiteSpace(password) ||
+        port is < 1 or > 65535)
+    {
+        throw new InvalidOperationException(
+            "Configure Database:Host, Port (1-65535), Name, User, and Password " +
+            "in appsettings.Local.json or environment variables, or supply ConnectionStrings:DefaultConnection.");
+    }
+
+    return new SqlConnectionStringBuilder
+    {
+        DataSource = $"{host},{port}",
+        InitialCatalog = database,
+        UserID = user,
+        Password = password,
+        Encrypt = true,
+        TrustServerCertificate = true,
+        MultipleActiveResultSets = true
+    }.ConnectionString;
 }
 
 static bool IsRunningInContainer()

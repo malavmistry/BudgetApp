@@ -33,6 +33,7 @@ BudgetApp is a personal budgeting web application used to manage monthly budgets
 - Recurring items use the user's local calendar day for copying into a month-bound budget; if that day does not exist in the target month, the previous valid day is used.
 - Quick Add on the home page resolves the primary monthly budget from the selected transaction date and MAY auto-create that budget.
 - AJAX behavior is implemented through named Razor Page handlers instead of MVC controllers.
+- Native execution uses the local SQL Server on port `1433`; Docker Compose runs the app against that same host server. Startup creates a missing database or applies pending EF migrations before serving requests. See `../05-database/database-architecture.md` for the configuration contract.
 
 ## Current repository shape
 

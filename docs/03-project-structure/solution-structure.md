@@ -10,7 +10,9 @@ The repository currently contains a single primary application project: `BudgetA
 - `docs/`: agentic documentation system
 - `BudgetApp/`: ASP.NET Core application source
 - `Dockerfile`: container build recipe
-- `docker-compose.yml`: local multi-container runtime with SQL Server
+- `docker-compose.yml`: application container connected to the existing host SQL Server
+- `.env.example`: non-secret template for Compose database settings; the actual `.env` is ignored
+- `BudgetApp/appsettings.Local.json`: optional ignored local credentials/configuration, excluded from publishing and Docker build context
 
 ## Rule
 
